@@ -1,28 +1,19 @@
 services:
   - type: web
-    name: telegram-pixabay-bot
+    name: telegram-searo-bot
     env: python
-    buildCommand: pip install --upgrade pip && pip install flask requests gunicorn python-telegram-bot && chmod +x start.sh
-    startCommand: ./start.sh
+    buildCommand: pip install flask requests gunicorn
+    startCommand: gunicorn --bind 0.0.0.0:$PORT main:app
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.9
       - key: BOT_TOKEN
-        sync: false
+        value: "8071576925:AAGgx_Jkuu-mRpjdMKiOQCDkkVQskXQYhQo"
       - key: ADMIN_ID
-        sync: false  
+        value: "7251748706"
       - key: PIXABAY_API_KEY
-        sync: false
+        value: "51444506-bffefcaf12816bd85a20222d1"
       - key: WEBHOOK_URL
-        value: https://telegram-searo.onrender.com/webhook
+        value: "https://telegram-searo.onrender.com/webhook"
       - key: SESSION_SECRET
-        generateValue: true
-      - key: PORT
-        value: 5000
+        value: "telegram_bot_secret_key_2025"
     healthCheckPath: /health
-    numInstances: 1
     plan: free
-    region: oregon
-    scaling:
-      minInstances: 1
-      maxInstances: 1

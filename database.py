@@ -311,6 +311,38 @@ class Database:
             logger.error(f"Error getting mandatory channels: {e}")
             return []
 
+    def remove_mandatory_channel(self, channel_id: str):
+        """Remove mandatory channel"""
+        try:
+            conn = sqlite3.connect(self.db_name)
+            cursor = conn.cursor()
+
+            cursor.execute("UPDATE mandatory_channels SET is_active = 0 WHERE channel_id = ?", (channel_id,))
+            conn.commit()
+            conn.close()
+            logger.info(f"Mandatory channel {channel_id} removed successfully")
+
+        except Exception as e:
+            logger.error(f"Error removing mandatory channel {channel_id}: {e}")
+
+    def add_notification(self, user_id: int, channel_id: str, notification_type: str):
+        """Add notification record"""
+        try:
+            conn = sqlite3.connect(self.db_name)
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                INSERT INTO notifications (user_id, channel_id, notification_type, timestamp)
+                VALUES (?, ?, ?, ?)
+            ''', (user_id, channel_id, notification_type, datetime.now().isoformat()))
+
+            conn.commit()
+            conn.close()
+            logger.info(f"Notification added for user {user_id}")
+
+        except Exception as e:
+            logger.error(f"Error adding notification: {e}")
+
     def add_search_history(self, user_id: int, query: str, search_type: str, results_count: int):
         """Add search to history"""
         try:
