@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: telegram-searo-bot
+    env: python
+    buildCommand: pip install flask requests gunicorn
+    startCommand: gunicorn --bind 0.0.0.0:$PORT main:app
+    healthCheckPath: /health
+    plan: free
+    region: oregon

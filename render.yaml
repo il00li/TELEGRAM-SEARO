@@ -2,21 +2,23 @@ services:
   - type: web
     name: telegram-pixabay-bot
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
+    buildCommand: pip install --upgrade pip && pip install flask requests gunicorn python-telegram-bot && chmod +x start.sh
+    startCommand: ./start.sh
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: BOT_TOKEN
-        value: 8071576925:AAGgx_Jkuu-mRpjdMKiOQCDkkVQskXQYhQo
+        sync: false
       - key: ADMIN_ID
-        value: 7251748706
+        sync: false  
       - key: PIXABAY_API_KEY
-        value: 51444506-bffefcaf12816bd85a20222d1
+        sync: false
       - key: WEBHOOK_URL
-        value: https://telegram-oihp.onrender.com/webhook
+        value: https://telegram-searo.onrender.com/webhook
       - key: SESSION_SECRET
-        value: your_session_secret_key_here
+        generateValue: true
+      - key: PORT
+        value: 5000
     healthCheckPath: /health
     numInstances: 1
     plan: free
