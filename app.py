@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Create Flask app
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "default_secret_key_for_render")
+app.secret_key = os.environ.get("SESSION_SECRET", "telegram_bot_secret_key_2025")
 
 # Initialize database and bot handler
 db = Database()

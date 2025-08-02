@@ -355,7 +355,7 @@ class TelegramBotHandler:
                 if self.check_user_subscription(user_id):
                     # Check if notification already sent for this user
                     user_info = self.db.get_user(user_id)
-                    if not user_info.get('notification_sent', False):
+                    if user_info and not user_info.get('notification_sent', False):
                         # Send notification about new member to admin
                         channels = self.db.get_mandatory_channels()
                         for channel in channels:
