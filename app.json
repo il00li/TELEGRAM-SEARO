@@ -1,0 +1,31 @@
+{
+  "name": "Telegram Pixabay Bot",
+  "description": "A Telegram bot for searching Pixabay content with admin panel",
+  "keywords": ["telegram", "bot", "pixabay", "flask"],
+  "env": {
+    "BOT_TOKEN": {
+      "description": "Telegram Bot Token from @BotFather"
+    },
+    "ADMIN_ID": {
+      "description": "Telegram User ID of the admin"
+    },
+    "PIXABAY_API_KEY": {
+      "description": "API key from Pixabay"
+    },
+    "SESSION_SECRET": {
+      "description": "Secret key for Flask sessions",
+      "generator": "secret"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ]
+}
