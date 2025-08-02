@@ -99,7 +99,7 @@ if __name__ == '__main__':
     
     # Initialize webhook
     try:
-        webhook_url = os.environ.get('WEBHOOK_URL', 'https://telegram-oihp.onrender.com/webhook')
+        webhook_url = os.environ.get('WEBHOOK_URL', 'https://telegram-searo.onrender.com/webhook')
         bot_handler.set_webhook(webhook_url)
         logger.info(f"Webhook set to: {webhook_url}")
     except Exception as e:
