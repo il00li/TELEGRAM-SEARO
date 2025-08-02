@@ -5,6 +5,7 @@ This is a Flask web application that provides a Telegram bot for searching and s
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
+Admin Interface: Telegram-only interface using /admin command with inline keyboard buttons (no web interface).
 
 # System Architecture
 
