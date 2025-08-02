@@ -1,11 +1,11 @@
 """
-Flask Web Application with Telegram Bot Integration
-Fixed for Render.com deployment with proper error handling
+Telegram Bot Application
+Optimized for Render.com deployment with Telegram-only interface
 """
 import os
 import logging
 import json
-from flask import Flask, request, render_template, jsonify, redirect, url_for, flash
+from flask import Flask, request, jsonify
 from bot_handler import TelegramBotHandler
 from database import Database
 
@@ -26,40 +26,18 @@ bot_handler = TelegramBotHandler()
 
 @app.route('/')
 def home():
-    """Home page with bot status and statistics"""
+    """Simple status page"""
     try:
         stats = db.get_bot_statistics()
-        return render_template('index.html', stats=stats)
-    except Exception as e:
-        logger.error(f"Error loading home page: {e}")
-        return render_template('index.html', stats={
-            'total_users': 0,
-            'total_searches': 0,
-            'active_channels': 0,
-            'banned_users': 0
+        return jsonify({
+            'status': 'running',
+            'bot_name': 'Pixabay Search Bot',
+            'admin_interface': 'Telegram only - use /admin command',
+            'stats': stats
         })
-
-@app.route('/admin')
-def admin_panel():
-    """Admin panel for bot management"""
-    try:
-        users = db.get_all_users()
-        channels = db.get_mandatory_channels()
-        recent_searches = db.get_recent_searches(limit=50)
-        stats = db.get_bot_statistics()
-        
-        return render_template('admin.html', 
-                             users=users, 
-                             channels=channels, 
-                             recent_searches=recent_searches,
-                             stats=stats)
     except Exception as e:
-        logger.error(f"Error loading admin panel: {e}")
-        return render_template('admin.html', 
-                             users=[], 
-                             channels=[], 
-                             recent_searches=[],
-                             stats={})
+        logger.error(f"Error loading status: {e}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -109,44 +87,7 @@ def health_check():
             'error': str(e)
         }), 500
 
-@app.route('/api/ban_user/<int:user_id>', methods=['POST'])
-def ban_user(user_id):
-    """Ban a user via API"""
-    try:
-        db.ban_user(user_id)
-        return jsonify({'success': True, 'message': f'User {user_id} banned successfully'})
-    except Exception as e:
-        logger.error(f"Error banning user {user_id}: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/unban_user/<int:user_id>', methods=['POST'])
-def unban_user(user_id):
-    """Unban a user via API"""
-    try:
-        db.unban_user(user_id)
-        return jsonify({'success': True, 'message': f'User {user_id} unbanned successfully'})
-    except Exception as e:
-        logger.error(f"Error unbanning user {user_id}: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/broadcast', methods=['POST'])
-def broadcast_message():
-    """Broadcast message to all users"""
-    try:
-        message = None
-        if request.json:
-            message = request.json.get('message')
-        if not message:
-            return jsonify({'success': False, 'error': 'Message is required'}), 400
-        
-        result = bot_handler.broadcast_message(message)
-        return jsonify({
-            'success': True, 
-            'message': f'Broadcast sent to {result["sent"]} users, {result["failed"]} failed'
-        })
-    except Exception as e:
-        logger.error(f"Error broadcasting message: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Configure for Render deployment

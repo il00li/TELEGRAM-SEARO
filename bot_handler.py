@@ -214,6 +214,88 @@ class TelegramBotHandler:
         except Exception as e:
             logger.error(f"Error sending new member notification: {e}")
 
+    def create_admin_keyboard(self) -> Dict:
+        """Create admin panel keyboard"""
+        keyboard = [
+            [
+                {'text': "📊 الإحصائيات", 'callback_data': "admin_stats"},
+                {'text': "👥 المستخدمون", 'callback_data': "admin_users"}
+            ],
+            [
+                {'text': "📢 القنوات الإجبارية", 'callback_data': "admin_channels"},
+                {'text': "🔍 البحثات الأخيرة", 'callback_data': "admin_searches"}
+            ],
+            [
+                {'text': "📣 إذاعة رسالة", 'callback_data': "admin_broadcast"},
+                {'text': "⚙️ إعدادات البوت", 'callback_data': "admin_settings"}
+            ],
+            [
+                {'text': "🔄 تحديث الإحصائيات", 'callback_data': "admin_refresh"}
+            ]
+        ]
+        return {'inline_keyboard': keyboard}
+
+    def create_user_management_keyboard(self, page: int = 1) -> Dict:
+        """Create user management keyboard with pagination"""
+        keyboard = [
+            [
+                {'text': "🚫 المحظورون", 'callback_data': "admin_banned_users"},
+                {'text': "✅ النشطون", 'callback_data': "admin_active_users"}
+            ],
+            [
+                {'text': "⬅️ السابق", 'callback_data': f"admin_users_page_{page-1}"},
+                {'text': f"صفحة {page}", 'callback_data': "admin_page_info"},
+                {'text': "➡️ التالي", 'callback_data': f"admin_users_page_{page+1}"}
+            ],
+            [
+                {'text': "🔙 العودة للإدارة", 'callback_data': "admin_main"}
+            ]
+        ]
+        return {'inline_keyboard': keyboard}
+
+    def create_channel_management_keyboard(self) -> Dict:
+        """Create channel management keyboard"""
+        keyboard = [
+            [
+                {'text': "➕ إضافة قناة", 'callback_data': "admin_add_channel"},
+                {'text': "🗑️ حذف قناة", 'callback_data': "admin_remove_channel"}
+            ],
+            [
+                {'text': "📋 قائمة القنوات", 'callback_data': "admin_list_channels"}
+            ],
+            [
+                {'text': "🔙 العودة للإدارة", 'callback_data': "admin_main"}
+            ]
+        ]
+        return {'inline_keyboard': keyboard}
+
+    def handle_admin_command(self, user_id: int, chat_id: int):
+        """Handle /admin command - only for admin"""
+        try:
+            # Check if user is admin
+            if user_id != self.admin_id:
+                self.send_message(chat_id, "❌ غير مصرح لك بالوصول للوحة الإدارة.")
+                return
+
+            stats = self.db.get_bot_statistics()
+            admin_message = f"""
+🔧 <b>لوحة إدارة البوت</b>
+
+📊 <b>إحصائيات سريعة:</b>
+• 👥 إجمالي المستخدمين: {stats['total_users']}
+• 🔍 إجمالي البحثات: {stats['total_searches']}
+• 📢 القنوات النشطة: {stats['active_channels']}
+• 🚫 المحظورون: {stats['banned_users']}
+
+اختر العملية التي تريد تنفيذها:
+"""
+            keyboard = self.create_admin_keyboard()
+            self.send_message(chat_id, admin_message, keyboard)
+
+        except Exception as e:
+            logger.error(f"Error handling admin command: {e}")
+            self.send_message(chat_id, "❌ حدث خطأ في لوحة الإدارة.")
+
     def handle_start_command(self, user_id: int, chat_id: int, user_data: Dict):
         """Handle /start command"""
         try:
@@ -323,9 +405,406 @@ class TelegramBotHandler:
                 message = "🔍 <b>بحث جديد</b>\n\nاختر نوع البحث:"
                 keyboard = self.create_search_keyboard()
                 self.send_message(chat_id, message, keyboard)
+            
+            # Admin panel callbacks
+            elif data.startswith("admin_"):
+                self.handle_admin_callback(user_id, chat_id, data)
                 
         except Exception as e:
             logger.error(f"Error handling callback query: {e}")
+
+    def handle_admin_callback(self, user_id: int, chat_id: int, callback_data: str):
+        """Handle admin panel callback queries"""
+        try:
+            # Check if user is admin
+            if user_id != self.admin_id:
+                self.send_message(chat_id, "❌ غير مصرح لك بالوصول للوحة الإدارة.")
+                return
+
+            if callback_data == "admin_main":
+                self.handle_admin_command(user_id, chat_id)
+                
+            elif callback_data == "admin_stats":
+                self.show_detailed_stats(chat_id)
+                
+            elif callback_data == "admin_users":
+                self.show_users_management(chat_id)
+                
+            elif callback_data == "admin_channels":
+                self.show_channels_management(chat_id)
+                
+            elif callback_data == "admin_searches":
+                self.show_recent_searches(chat_id)
+                
+            elif callback_data == "admin_broadcast":
+                self.start_broadcast_mode(user_id, chat_id)
+                
+            elif callback_data == "admin_settings":
+                self.show_bot_settings(chat_id)
+                
+            elif callback_data == "admin_refresh":
+                self.handle_admin_command(user_id, chat_id)
+                
+            elif callback_data.startswith("admin_ban_"):
+                target_user_id = int(callback_data.replace("admin_ban_", ""))
+                self.ban_user_admin(chat_id, target_user_id)
+                
+            elif callback_data.startswith("admin_unban_"):
+                target_user_id = int(callback_data.replace("admin_unban_", ""))
+                self.unban_user_admin(chat_id, target_user_id)
+                
+            elif callback_data == "admin_list_channels":
+                self.list_mandatory_channels(chat_id)
+                
+            elif callback_data.startswith("broadcast_confirm_"):
+                # Execute the broadcast
+                session = self.user_sessions.get(user_id, {})
+                broadcast_message = session.get('broadcast_message', '')
+                if broadcast_message:
+                    self.execute_broadcast(chat_id, broadcast_message)
+                else:
+                    self.send_message(chat_id, "❌ لا توجد رسالة للإذاعة.")
+                    
+            elif callback_data.startswith("remove_channel_"):
+                channel_id = callback_data.replace("remove_channel_", "")
+                self.remove_mandatory_channel(chat_id, channel_id)
+                
+        except Exception as e:
+            logger.error(f"Error handling admin callback: {e}")
+            self.send_message(chat_id, "❌ حدث خطأ في العملية الإدارية.")
+
+    def remove_mandatory_channel(self, chat_id: int, channel_id: str):
+        """Remove mandatory channel"""
+        try:
+            # Get channel info before removing
+            channels = self.db.get_mandatory_channels()
+            channel_info = None
+            for ch in channels:
+                if str(ch['channel_id']) == str(channel_id):
+                    channel_info = ch
+                    break
+            
+            if channel_info:
+                self.db.remove_mandatory_channel(channel_id)
+                message = f"✅ تم حذف القناة <b>{channel_info['channel_username']}</b> من القائمة الإجبارية بنجاح."
+            else:
+                message = "❌ لم يتم العثور على القناة."
+                
+            keyboard = {'inline_keyboard': [[{'text': "🔙 العودة لقائمة القنوات", 'callback_data': "admin_list_channels"}]]}
+            self.send_message(chat_id, message, keyboard)
+            
+        except Exception as e:
+            logger.error(f"Error removing mandatory channel: {e}")
+            self.send_message(chat_id, "❌ حدث خطأ في حذف القناة.")
+
+    def show_detailed_stats(self, chat_id: int):
+        """Show detailed bot statistics"""
+        try:
+            stats = self.db.get_bot_statistics()
+            recent_searches = self.db.get_recent_searches(limit=5)
+            
+            stats_message = f"""
+📊 <b>إحصائيات البوت التفصيلية</b>
+
+👥 <b>المستخدمون:</b>
+• إجمالي المستخدمين: {stats['total_users']}
+• المستخدمون النشطون: {stats['active_users']}
+• المحظورون: {stats['banned_users']}
+
+🔍 <b>البحثات:</b>
+• إجمالي البحثات: {stats['total_searches']}
+• البحثات الأخيرة (24 ساعة): {stats['recent_searches']}
+
+📢 <b>القنوات:</b>
+• القنوات النشطة: {stats['active_channels']}
+
+🕐 <b>آخر 5 بحثات:</b>
+"""
+            
+            for search in recent_searches[:5]:
+                search_type_emoji = {
+                    'images': '🖼️',
+                    'videos': '🎥', 
+                    'music': '🎵',
+                    'gifs': '🎭'
+                }.get(search['search_type'], '🔍')
+                
+                stats_message += f"• {search_type_emoji} {search['query']} - {search['user_name']}\n"
+            
+            keyboard = {'inline_keyboard': [[{'text': "🔙 العودة للإدارة", 'callback_data': "admin_main"}]]}
+            self.send_message(chat_id, stats_message, keyboard)
+            
+        except Exception as e:
+            logger.error(f"Error showing detailed stats: {e}")
+            self.send_message(chat_id, "❌ حدث خطأ في عرض الإحصائيات.")
+
+    def show_users_management(self, chat_id: int):
+        """Show users management panel"""
+        try:
+            users = self.db.get_all_users()
+            active_users = [u for u in users if not u['is_banned']]
+            banned_users = [u for u in users if u['is_banned']]
+            
+            message = f"""
+👥 <b>إدارة المستخدمين</b>
+
+📊 <b>الإحصائيات:</b>
+• إجمالي المستخدمين: {len(users)}
+• المستخدمون النشطون: {len(active_users)}
+• المحظورون: {len(banned_users)}
+
+<b>آخر 10 مستخدمين:</b>
+"""
+            
+            for user in users[:10]:
+                status = "🚫 محظور" if user['is_banned'] else "✅ نشط"
+                username = f"@{user['username']}" if user['username'] else "لا يوجد"
+                message += f"• {user['first_name']} ({username}) - {status}\n"
+                message += f"  البحثات: {user['search_count']} | ID: <code>{user['user_id']}</code>\n\n"
+            
+            keyboard = self.create_user_management_keyboard()
+            self.send_message(chat_id, message[:4096], keyboard)  # Telegram message limit
+            
+        except Exception as e:
+            logger.error(f"Error showing users management: {e}")
+            self.send_message(chat_id, "❌ حدث خطأ في عرض المستخدمين.")
+
+    def show_channels_management(self, chat_id: int):
+        """Show channels management panel"""
+        try:
+            channels = self.db.get_mandatory_channels()
+            
+            message = f"""
+📢 <b>إدارة القنوات الإجبارية</b>
+
+📊 <b>عدد القنوات النشطة:</b> {len(channels)}
+
+<b>قائمة القنوات:</b>
+"""
+            
+            if channels:
+                for i, channel in enumerate(channels, 1):
+                    message += f"{i}. {channel['channel_username']}\n"
+                    message += f"   ID: <code>{channel['channel_id']}</code>\n"
+                    message += f"   تاريخ الإضافة: {channel['added_date'][:10]}\n\n"
+            else:
+                message += "لا توجد قنوات إجبارية مضافة حالياً.\n"
+            
+            keyboard = self.create_channel_management_keyboard()
+            self.send_message(chat_id, message, keyboard)
+            
+        except Exception as e:
+            logger.error(f"Error showing channels management: {e}")
+            self.send_message(chat_id, "❌ حدث خطأ في عرض القنوات.")
+
+    def show_recent_searches(self, chat_id: int):
+        """Show recent searches"""
+        try:
+            searches = self.db.get_recent_searches(limit=20)
+            
+            message = """
+🔍 <b>البحثات الأخيرة (آخر 20)</b>
+
+"""
+            
+            if searches:
+                for search in searches:
+                    search_type_emoji = {
+                        'images': '🖼️',
+                        'videos': '🎥',
+                        'music': '🎵', 
+                        'gifs': '🎭'
+                    }.get(search['search_type'], '🔍')
+                    
+                    username = f"@{search['username']}" if search['username'] else search['user_name']
+                    message += f"{search_type_emoji} <b>{search['query']}</b>\n"
+                    message += f"   👤 {username} | 📊 {search['results_count']} نتيجة\n"
+                    message += f"   🕐 {search['timestamp'][:16]}\n\n"
+            else:
+                message += "لا توجد بحثات مسجلة حالياً.\n"
+            
+            keyboard = {'inline_keyboard': [[{'text': "🔙 العودة للإدارة", 'callback_data': "admin_main"}]]}
+            self.send_message(chat_id, message[:4096], keyboard)
+            
+        except Exception as e:
+            logger.error(f"Error showing recent searches: {e}")
+            self.send_message(chat_id, "❌ حدث خطأ في عرض البحثات.")
+
+    def start_broadcast_mode(self, user_id: int, chat_id: int):
+        """Start broadcast message mode"""
+        try:
+            self.user_sessions[user_id] = {
+                'mode': 'broadcast',
+                'waiting_for_message': True
+            }
+            
+            message = """
+📣 <b>إذاعة رسالة</b>
+
+أرسل الرسالة التي تريد إذاعتها لجميع مستخدمي البوت.
+
+⚠️ <b>تنبيه:</b> ستصل الرسالة لجميع المستخدمين المسجلين في البوت.
+"""
+            
+            keyboard = {'inline_keyboard': [[{'text': "❌ إلغاء", 'callback_data': "admin_main"}]]}
+            self.send_message(chat_id, message, keyboard)
+            
+        except Exception as e:
+            logger.error(f"Error starting broadcast mode: {e}")
+            self.send_message(chat_id, "❌ حدث خطأ في بدء الإذاعة.")
+
+    def show_bot_settings(self, chat_id: int):
+        """Show bot settings panel"""
+        try:
+            # Test API connections
+            pixabay_status = "✅ متصل" if self.pixabay.test_api_connection() else "❌ غير متصل"
+            bot_status = "✅ متصل" if self.check_bot_status() == "online" else "❌ غير متصل"
+            
+            message = f"""
+⚙️ <b>إعدادات البوت</b>
+
+🔌 <b>حالة الاتصالات:</b>
+• Bot API: {bot_status}
+• Pixabay API: {pixabay_status}
+
+🎛️ <b>الإعدادات الحالية:</b>
+• معرف الإدارة: <code>{self.admin_id}</code>
+• عدد النتائج لكل بحث: 20
+• اللغة: العربية + الإنجليزية
+
+📊 <b>معلومات النظام:</b>
+• إصدار البوت: 2.0
+• قاعدة البيانات: SQLite
+• المنصة: Render.com
+"""
+            
+            keyboard = {'inline_keyboard': [[{'text': "🔙 العودة للإدارة", 'callback_data': "admin_main"}]]}
+            self.send_message(chat_id, message, keyboard)
+            
+        except Exception as e:
+            logger.error(f"Error showing bot settings: {e}")
+            self.send_message(chat_id, "❌ حدث خطأ في عرض الإعدادات.")
+
+    def ban_user_admin(self, chat_id: int, target_user_id: int):
+        """Ban user via admin panel"""
+        try:
+            self.db.ban_user(target_user_id)
+            self.send_message(chat_id, f"✅ تم حظر المستخدم {target_user_id} بنجاح.")
+            
+        except Exception as e:
+            logger.error(f"Error banning user: {e}")
+            self.send_message(chat_id, "❌ حدث خطأ في حظر المستخدم.")
+
+    def unban_user_admin(self, chat_id: int, target_user_id: int):
+        """Unban user via admin panel"""
+        try:
+            self.db.unban_user(target_user_id)
+            self.send_message(chat_id, f"✅ تم إلغاء حظر المستخدم {target_user_id} بنجاح.")
+            
+        except Exception as e:
+            logger.error(f"Error unbanning user: {e}")
+            self.send_message(chat_id, "❌ حدث خطأ في إلغاء حظر المستخدم.")
+
+    def handle_broadcast_message(self, user_id: int, chat_id: int, message_text: str):
+        """Handle broadcast message from admin"""
+        try:
+            # Reset user session
+            self.user_sessions[user_id] = {}
+            
+            # Confirm broadcast
+            confirm_message = f"""
+📣 <b>تأكيد الإذاعة</b>
+
+الرسالة التي ستُرسل:
+━━━━━━━━━━━━━━━━━━━━
+{message_text}
+━━━━━━━━━━━━━━━━━━━━
+
+هل تريد إرسال هذه الرسالة لجميع المستخدمين؟
+"""
+            
+            keyboard = {
+                'inline_keyboard': [
+                    [
+                        {'text': "✅ نعم، أرسل", 'callback_data': f"broadcast_confirm_{hash(message_text) % 10000}"},
+                        {'text': "❌ إلغاء", 'callback_data': "admin_main"}
+                    ]
+                ]
+            }
+            
+            # Store broadcast message temporarily
+            self.user_sessions[user_id] = {'broadcast_message': message_text}
+            
+            self.send_message(chat_id, confirm_message, keyboard)
+            
+        except Exception as e:
+            logger.error(f"Error handling broadcast message: {e}")
+            self.send_message(chat_id, "❌ حدث خطأ في معالجة رسالة الإذاعة.")
+
+    def execute_broadcast(self, chat_id: int, message_text: str):
+        """Execute broadcast message to all users"""
+        try:
+            broadcast_result = self.broadcast_message(message_text)
+            
+            result_message = f"""
+📣 <b>نتيجة الإذاعة</b>
+
+✅ تم الإرسال لـ: {broadcast_result['sent']} مستخدم
+❌ فشل الإرسال لـ: {broadcast_result['failed']} مستخدم
+
+الرسالة المُرسلة:
+━━━━━━━━━━━━━━━━━━━━
+{message_text}
+━━━━━━━━━━━━━━━━━━━━
+"""
+            
+            keyboard = {'inline_keyboard': [[{'text': "🔙 العودة للإدارة", 'callback_data': "admin_main"}]]}
+            self.send_message(chat_id, result_message, keyboard)
+            
+        except Exception as e:
+            logger.error(f"Error executing broadcast: {e}")
+            self.send_message(chat_id, "❌ حدث خطأ في تنفيذ الإذاعة.")
+
+    def list_mandatory_channels(self, chat_id: int):
+        """List all mandatory channels with management options"""
+        try:
+            channels = self.db.get_mandatory_channels()
+            
+            message = f"""
+📢 <b>قائمة القنوات الإجبارية</b>
+
+📊 <b>العدد الإجمالي:</b> {len(channels)}
+
+"""
+            
+            keyboard_buttons = []
+            
+            if channels:
+                for i, channel in enumerate(channels, 1):
+                    message += f"{i}. <b>{channel['channel_username']}</b>\n"
+                    message += f"   • ID: <code>{channel['channel_id']}</code>\n"
+                    message += f"   • تاريخ الإضافة: {channel['added_date'][:10]}\n\n"
+                    
+                    # Add remove button for each channel
+                    keyboard_buttons.append([{
+                        'text': f"🗑️ حذف {channel['channel_username'][:15]}...",
+                        'callback_data': f"remove_channel_{channel['channel_id']}"
+                    }])
+            else:
+                message += "❌ لا توجد قنوات إجبارية مضافة حالياً.\n"
+            
+            # Add management buttons
+            keyboard_buttons.extend([
+                [{'text': "➕ إضافة قناة جديدة", 'callback_data': "admin_add_channel"}],
+                [{'text': "🔙 العودة لإدارة القنوات", 'callback_data': "admin_channels"}]
+            ])
+            
+            keyboard = {'inline_keyboard': keyboard_buttons}
+            self.send_message(chat_id, message[:4096], keyboard)
+            
+        except Exception as e:
+            logger.error(f"Error listing mandatory channels: {e}")
+            self.send_message(chat_id, "❌ حدث خطأ في عرض قائمة القنوات.")
 
     def handle_navigation(self, user_id: int, chat_id: int, nav_data: str):
         """Handle navigation through search results"""
@@ -464,11 +943,15 @@ class TelegramBotHandler:
 • استخدم أزرار التنقل لتصفح النتائج
 """
                     self.send_message(chat_id, help_message)
+                elif text.startswith('/admin'):
+                    self.handle_admin_command(user_id, chat_id)
                 else:
-                    # Check if user is waiting for search query
+                    # Check if user is waiting for search query or broadcast message
                     session = self.user_sessions.get(user_id, {})
                     if session.get('waiting_for_query'):
                         self.handle_search_query(user_id, chat_id, text)
+                    elif session.get('mode') == 'broadcast' and session.get('waiting_for_message'):
+                        self.handle_broadcast_message(user_id, chat_id, text)
                     else:
                         self.send_message(chat_id, "استخدم /start لبدء استخدام البوت أو اختر من الأزرار المتاحة.")
                         
