@@ -12,7 +12,7 @@ services:
       - key: PIXABAY_API_KEY
         value: "51444506-bffefcaf12816bd85a20222d1"
       - key: WEBHOOK_URL
-        value: "https://telegram-searo.onrender.com/webhook"
+        value: "https://telegram-searo-2.onrender.com/webhook"
       - key: SESSION_SECRET
         value: "telegram_bot_secret_key_2025"
     healthCheckPath: /health
